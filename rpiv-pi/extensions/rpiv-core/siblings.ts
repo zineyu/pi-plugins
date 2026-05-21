@@ -22,7 +22,7 @@ export interface SiblingPlugin {
 export const SIBLINGS: readonly SiblingPlugin[] = [
 	{
 		pkg: "npm:@tintinweb/pi-subagents",
-		matches: /@tintinweb\/pi-subagents/i,
+		matches: /pi-subagents/i,
 		provides: "Agent / get_subagent_result / steer_subagent tools",
 	},
 	{
