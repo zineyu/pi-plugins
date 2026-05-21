@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" role="img" aria-label="rpiv-args — Arguments and shell substitution in skill prompts" preserveAspectRatio="xMidYMid meet">
+  <title>rpiv-args — Arguments and shell substitution in skill prompts</title>
+  <defs>
+    <style>
+      .mono { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .serif { font-family: 'Iowan Old Style', 'Hoefler Text', Charter, 'Source Serif Pro', Georgia, serif; }
+      .ink { fill: #ede6d3; }
+      .text-quiet { fill: #a8a29e; }
+      .text-distant { fill: #9c968d; }
+      .ochre { fill: #a8896c; }
+      .sage { fill: #8a9580; }
+      .sage-deep { fill: #5e6b56; }
+    </style>
+    <radialGradient id="wash-ochre" cx="25%" cy="10%" r="65%">
+      <stop offset="0%" stop-color="#a8896c" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#a8896c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wash-sage" cx="85%" cy="90%" r="55%">
+      <stop offset="0%" stop-color="#8a9580" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#8a9580" stop-opacity="0"/>
+    </radialGradient>
+
+  </defs>
+
+  <rect width="1280" height="800" fill="#1c1a17"/>
+  <rect width="1280" height="800" fill="url(#wash-ochre)"/>
+  <rect width="1280" height="800" fill="url(#wash-sage)"/>
+
+  <g fill="none" stroke="#8a9580" stroke-linecap="round" opacity="0.45">
+    <path d="M1120 60 q36 -52 88 -60 q40 -5 68 14" stroke-width="1.1"/>
+    <path d="M1140 80 q28 -18 60 -14 q24 3 42 14" stroke-width="0.7" opacity="0.6"/>
+    <circle cx="1210" cy="32" r="2" opacity="0.5"/>
+    <circle cx="1160" cy="60" r="1.4" opacity="0.4"/>
+  </g>
+
+  <text class="mono text-distant" x="80" y="64" font-size="11" letter-spacing="0.18em">PI AGENT EXTENSION</text>
+
+  <text class="serif ink" x="80" y="152" font-size="80" font-weight="700" letter-spacing="-2.5">rpiv<tspan class="ochre">-</tspan>args</text>
+  <text class="mono text-quiet" x="80" y="196" font-size="19" letter-spacing="0.2">Arguments and shell output, baked into the skill prompt.</text>
+
+  <line x1="80" y1="228" x2="1200" y2="228" stroke="#2e2b27" stroke-width="1"/>
+
+  <!-- Content card -->
+  <rect x="80" y="264" width="1120" height="440" rx="3" fill="#252220" stroke="#3a3631" stroke-width="1"/>
+
+  <!-- Vertical divider inside card -->
+  <line x1="640" y1="300" x2="640" y2="668" stroke="#3a3631" stroke-width="1"/>
+
+  <!-- LEFT COLUMN: $ARGUMENTS -->
+  <text class="mono ochre" x="120" y="316" font-size="12" letter-spacing="0.2em" font-weight="700">A &#8212; ARGUMENTS</text>
+  <text class="mono" x="120" y="354" font-size="17"><tspan class="sage" font-weight="700">&#10095;</tspan> <tspan class="ink">/skill:deploy api production</tspan></text>
+
+  <text class="mono text-distant" x="120" y="398" font-size="11" letter-spacing="0.2em">SKILL BODY</text>
+  <text class="mono" xml:space="preserve" x="120" y="432" font-size="17"><tspan class="text-distant">  Deploy service </tspan><tspan class="ochre" font-weight="700">$1</tspan><tspan class="text-distant"> to </tspan><tspan class="ochre" font-weight="700">$2</tspan><tspan class="text-distant">.</tspan></text>
+  <text class="mono" xml:space="preserve" x="120" y="458" font-size="17"><tspan class="text-distant">  Tag: </tspan><tspan class="ochre" font-weight="700">$ARGUMENTS</tspan></text>
+
+  <text class="mono sage" x="356" y="502" font-size="20" font-weight="700" text-anchor="middle">&#8595;</text>
+
+  <text class="mono text-distant" x="120" y="544" font-size="11" letter-spacing="0.2em">RENDERED</text>
+  <text class="mono ink" xml:space="preserve" x="120" y="578" font-size="17">  Deploy service <tspan class="sage" font-weight="700">api</tspan> to <tspan class="sage" font-weight="700">production</tspan>.</text>
+  <text class="mono ink" xml:space="preserve" x="120" y="604" font-size="17">  Tag: <tspan class="sage" font-weight="700">api production</tspan></text>
+
+  <text class="mono" x="120" y="654" font-size="11" letter-spacing="0.1em"><tspan class="sage">&#10003;</tspan> <tspan class="text-distant">POSITIONAL + FULL</tspan></text>
+
+  <!-- RIGHT COLUMN: !`shell` -->
+  <text class="mono ochre" x="680" y="316" font-size="12" letter-spacing="0.2em" font-weight="700">B &#8212; SHELL SUBSTITUTION</text>
+  <text class="mono" x="680" y="354" font-size="17"><tspan class="sage" font-weight="700">&#10095;</tspan> <tspan class="ink">/skill:commit</tspan></text>
+
+  <text class="mono text-distant" x="680" y="398" font-size="11" letter-spacing="0.2em">SKILL BODY</text>
+  <text class="mono" xml:space="preserve" x="680" y="432" font-size="17"><tspan class="text-distant">  Draft a commit for the diff.</tspan></text>
+  <text class="mono" xml:space="preserve" x="680" y="458" font-size="17"><tspan class="ochre" font-weight="700">  !`git status -s`</tspan></text>
+  <text class="mono" xml:space="preserve" x="680" y="484" font-size="17"><tspan class="ochre" font-weight="700">  !`git log -3 --oneline`</tspan></text>
+
+  <text class="mono sage" x="916" y="518" font-size="20" font-weight="700" text-anchor="middle">&#8595;</text>
+
+  <text class="mono text-distant" x="680" y="550" font-size="11" letter-spacing="0.2em">RENDERED</text>
+  <text class="mono ink" xml:space="preserve" x="680" y="578" font-size="16">  Draft a commit for the diff.</text>
+  <text class="mono sage" xml:space="preserve" x="680" y="602" font-size="15">   M src/auth/session.ts</text>
+  <text class="mono sage" xml:space="preserve" x="680" y="624" font-size="15">   M src/auth/session.test.ts</text>
+  <text class="mono sage" xml:space="preserve" x="680" y="646" font-size="15">  a3f91c2 fix(auth): refresh token race</text>
+  <text class="mono" x="680" y="676" font-size="11" letter-spacing="0.1em"><tspan class="sage">&#10003;</tspan> <tspan class="text-distant">EVIDENCE, NOT TOOL CALLS</tspan></text>
+
+  <line x1="80" y1="740" x2="1200" y2="740" stroke="#2e2b27" stroke-width="1"/>
+
+  <text class="mono text-distant" x="80" y="776" font-size="12" letter-spacing="0.12em">
+    <tspan class="ochre" font-weight="700">&#9612; rpiv-args</tspan>
+    <tspan dx="12">&#9474;</tspan>
+    <tspan dx="12" class="sage">$1 $2 $ARGUMENTS</tspan>
+    <tspan dx="12">&#9474;</tspan>
+    <tspan dx="12">!`cmd`</tspan>
+    <tspan dx="12">&#9474;</tspan>
+    <tspan dx="12">npm:@juicesharp/rpiv-args</tspan>
+  </text>
+</svg>

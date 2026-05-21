@@ -1,0 +1,77 @@
+{
+  "name": "@aliou/pi-processes",
+  "version": "0.9.3",
+  "license": "MIT",
+  "type": "module",
+  "private": false,
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "processes"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aliou/pi-processes"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills/pi-processes"
+    ],
+    "video": "https://assets.aliou.me/github/aliou/pi-processes/demo.mp4"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "skills",
+    "README.md",
+    "CONTRIBUTING.md"
+  ],
+  "dependencies": {
+    "@aliou/pi-utils-settings": "^0.15.1",
+    "@aliou/pi-utils-ui": "^0.4.1",
+    "@aliou/sh": "^0.1.0",
+    "typebox": "^1.1.38"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">0.70.0 <1",
+    "@earendil-works/pi-tui": ">0.70.0 <1"
+  },
+  "devDependencies": {
+    "@aliou/biome-plugins": "^0.8.1",
+    "@biomejs/biome": "^2.4.15",
+    "@changesets/cli": "^2.31.0",
+    "@types/node": "^25.9.1",
+    "husky": "^9.1.7",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7",
+    "@earendil-works/pi-ai": "^0.75.3",
+    "@earendil-works/pi-coding-agent": "^0.75.3",
+    "@earendil-works/pi-tui": "^0.75.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "format": "biome check --write",
+    "check:lockfile": "pnpm install --frozen-lockfile --ignore-scripts",
+    "prepare": "[ -d .git ] && husky || true",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "test": "vitest run",
+    "release": "pnpm changeset publish"
+  },
+  "packageManager": "pnpm@10.26.1",
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
+      "optional": true
+    }
+  }
+}

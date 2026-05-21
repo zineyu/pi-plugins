@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" role="img" aria-label="rpiv-web-tools — Pluggable web search and fetch for Pi Agent" preserveAspectRatio="xMidYMid meet">
+  <title>rpiv-web-tools — Search the web. Read the page.</title>
+  <defs>
+    <style>
+      .mono { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .serif { font-family: 'Iowan Old Style', 'Hoefler Text', Charter, 'Source Serif Pro', Georgia, serif; }
+      .ink { fill: #ede6d3; }
+      .text-quiet { fill: #a8a29e; }
+      .text-distant { fill: #9c968d; }
+      .ochre { fill: #a8896c; }
+      .sage { fill: #8a9580; }
+      .sage-deep { fill: #5e6b56; }
+    </style>
+    <radialGradient id="wash-ochre" cx="25%" cy="10%" r="65%">
+      <stop offset="0%" stop-color="#a8896c" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#a8896c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wash-sage" cx="85%" cy="90%" r="55%">
+      <stop offset="0%" stop-color="#8a9580" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#8a9580" stop-opacity="0"/>
+    </radialGradient>
+
+  </defs>
+
+  <rect width="1280" height="800" fill="#1c1a17"/>
+  <rect width="1280" height="800" fill="url(#wash-ochre)"/>
+  <rect width="1280" height="800" fill="url(#wash-sage)"/>
+
+  <g fill="none" stroke="#8a9580" stroke-linecap="round" opacity="0.45">
+    <path d="M1120 60 q36 -52 88 -60 q40 -5 68 14" stroke-width="1.1"/>
+    <path d="M1140 80 q28 -18 60 -14 q24 3 42 14" stroke-width="0.7" opacity="0.6"/>
+    <circle cx="1210" cy="32" r="2" opacity="0.5"/>
+    <circle cx="1160" cy="60" r="1.4" opacity="0.4"/>
+  </g>
+
+  <text class="mono text-distant" x="80" y="64" font-size="11" letter-spacing="0.18em">PI AGENT EXTENSION</text>
+
+  <text class="serif ink" x="80" y="152" font-size="80" font-weight="700" letter-spacing="-2.5">rpiv<tspan class="ochre">-</tspan>web<tspan class="ochre">-</tspan>tools</text>
+  <text class="mono text-quiet" x="80" y="196" font-size="19" letter-spacing="0.2">Search the web. Read the page.</text>
+
+  <line x1="80" y1="228" x2="1200" y2="228" stroke="#2e2b27" stroke-width="1"/>
+
+  <rect x="80" y="264" width="1120" height="440" rx="3" fill="#1c1a17" stroke="#3a3631" stroke-width="1"/>
+
+  <!-- Provider strip -->
+  <text class="mono text-distant" x="120" y="300" font-size="11" letter-spacing="0.2em">PROVIDERS</text>
+
+  <rect x="220" y="284" width="92" height="24" rx="2" fill="#2d2925" stroke="#8a9580" stroke-width="1.2"/>
+  <text class="mono sage" x="266" y="301" font-size="13" font-weight="700" text-anchor="middle" xml:space="preserve">&#10003; Brave</text>
+
+  <rect x="320" y="284" width="80" height="24" rx="2" fill="none" stroke="#3a3631" stroke-width="1"/>
+  <text class="mono text-distant" x="360" y="301" font-size="13" text-anchor="middle">Tavily</text>
+
+  <rect x="408" y="284" width="80" height="24" rx="2" fill="none" stroke="#3a3631" stroke-width="1"/>
+  <text class="mono text-distant" x="448" y="301" font-size="13" text-anchor="middle">Serper</text>
+
+  <rect x="496" y="284" width="60" height="24" rx="2" fill="none" stroke="#3a3631" stroke-width="1"/>
+  <text class="mono text-distant" x="526" y="301" font-size="13" text-anchor="middle">Exa</text>
+
+  <rect x="564" y="284" width="68" height="24" rx="2" fill="none" stroke="#3a3631" stroke-width="1"/>
+  <text class="mono text-distant" x="598" y="301" font-size="13" text-anchor="middle">Jina</text>
+
+  <rect x="640" y="284" width="100" height="24" rx="2" fill="none" stroke="#3a3631" stroke-width="1"/>
+  <text class="mono text-distant" x="690" y="301" font-size="13" text-anchor="middle">Firecrawl</text>
+
+  <text class="mono text-distant" x="1160" y="301" font-size="11" letter-spacing="0.15em" text-anchor="end">/web-search-config</text>
+
+  <line x1="120" y1="324" x2="1160" y2="324" stroke="#2e2b27" stroke-width="1"/>
+
+  <!-- Search prompt -->
+  <text class="mono" x="120" y="358" font-size="20"><tspan class="sage" font-weight="700">&#10095;</tspan> <tspan class="ink">web_search</tspan> <tspan class="text-quiet">"server-sent events vs websockets"</tspan></text>
+
+  <!-- Results -->
+  <text class="mono" x="120" y="414" font-size="20"><tspan class="ochre" font-weight="700">01</tspan>  <tspan class="ink" font-weight="700">Server-Sent Events vs WebSockets</tspan></text>
+  <text class="mono sage" x="120" y="442" font-size="16">    https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events</text>
+
+  <text class="mono" x="120" y="494" font-size="20"><tspan class="ochre" font-weight="700">02</tspan>  <tspan class="ink" font-weight="700">When to choose SSE over WebSockets</tspan></text>
+  <text class="mono sage" x="120" y="522" font-size="16">    https://ably.com/blog/sse-vs-websockets</text>
+
+  <text class="mono" x="120" y="574" font-size="20"><tspan class="ochre" font-weight="700">03</tspan>  <tspan class="ink" font-weight="700">EventSource: a tour through the standard</tspan></text>
+  <text class="mono sage" x="120" y="602" font-size="16">    https://html.spec.whatwg.org/multipage/server-sent-events.html</text>
+
+  <!-- Status -->
+  <text class="mono" x="120" y="660" font-size="13" letter-spacing="0.12em"><tspan class="sage" font-weight="700">[200 OK]</tspan>  <tspan class="text-distant">3 RESULTS &#183; ACTIVE: BRAVE &#183; 0.42s</tspan></text>
+
+  <line x1="80" y1="740" x2="1200" y2="740" stroke="#2e2b27" stroke-width="1"/>
+
+  <text class="mono text-distant" x="80" y="776" font-size="12" letter-spacing="0.12em">
+    <tspan class="ochre" font-weight="700">&#9612; rpiv-web-tools</tspan>
+    <tspan dx="12">&#9474;</tspan>
+    <tspan dx="12" class="sage">6 providers</tspan>
+    <tspan dx="12">&#9474;</tspan>
+    <tspan dx="12">npm:@juicesharp/rpiv-web-tools</tspan>
+  </text>
+</svg>
