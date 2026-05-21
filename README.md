@@ -6,10 +6,8 @@ Collection of pi coding agent plugins sourced from upstream repositories.
 
 | Plugin | Source | Description |
 |--------|--------|-------------|
-| pi-tui | [badlogic/pi-mono](https://github.com/badlogic/pi-mono) | TUI components for pi |
 | pi-mcp-adapter | [nicobailon/pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) | MCP adapter for pi |
 | pi-processes | [aliou/pi-processes](https://github.com/aliou/pi-processes) | Process management |
-| pi-total-recall | [samfoy/pi-total-recall](https://github.com/samfoy/pi-total-recall) | Session recall & search |
 | rpiv-pi | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV core |
 | rpiv-btw | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV btw |
 | pi-rtk | [mcowger/pi-rtk](https://github.com/mcowger/pi-rtk) | RTK integration |
