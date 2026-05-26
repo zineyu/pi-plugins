@@ -1,25 +1,57 @@
-# pi-plugins
+# pi-hashline
 
-Collection of pi coding agent plugins sourced from upstream repositories.
+Hashline edit tool for [pi](https://pi.dev) — line-anchored file edits via content hashes, inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi).
 
-## Plugins
+## What is Hashline?
 
-| Plugin | Source | Description |
-|--------|--------|-------------|
-| pi-mcp-adapter | [nicobailon/pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) | MCP adapter for pi |
-| pi-processes | [aliou/pi-processes](https://github.com/aliou/pi-processes) | Process management |
-| rpiv-pi | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV core |
-| rpiv-btw | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV btw |
-| pi-rtk | [mcowger/pi-rtk](https://github.com/mcowger/pi-rtk) | RTK integration |
-| pi-subagents | [tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents) | Subagent framework |
-| rpiv-todo | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV todo |
-| rpiv-advisor | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV advisor |
-| rpiv-i18n | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV i18n |
-| rpiv-web-tools | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV web tools |
-| rpiv-args | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV args |
-| rpiv-ask-user-question | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) | RPIV ask-user-question |
+When a model reads a file, every line comes back tagged with a 2-character content hash:
+
+```
+11:a3|function hello() {
+22:f1|  return "world";
+33:0e|}
+```
+
+To edit, the model references those anchors instead of reproducing old text exactly:
+
+- `»ANCHOR` — insert after the anchored line (or `EOF`)
+- `«ANCHOR` — insert before the anchored line (or `BOF`)
+- `≔START..END` — replace the inclusive range (delete if no payload follows)
+
+If the file changed since the last read, the hashes won't match and the edit is rejected before anything gets corrupted.
+
+## Install
+
+```bash
+pi install git:github.com/zineyu/pi-plugins
+```
+
+Or clone into your pi extensions directory:
+
+```bash
+cd ~/.pi/agent/extensions
+git clone https://github.com/zineyu/pi-plugins.git pi-hashline
+```
 
 ## Usage
 
-These are extracted source snapshots from upstream for reference and customization.
-To use with pi, install via local path or git URL.
+Once loaded, the extension does two things:
+
+1. **Decorates `read` output** with `LINE+HASH|` prefixes so the model sees anchors automatically.
+2. **Registers a `hashline_edit` tool** that accepts patch text in hashline format.
+
+Example patch:
+
+```
+§src/main.ts
+≔11:a3..11:a3
+function hi() {
+  return "universe";
+}
+»33:0e
+console.log("done");
+```
+
+## Why?
+
+Traditional `str_replace` requires the model to reproduce every character perfectly — including whitespace and indentation. Hashline eliminates that failure mode by giving the model stable, verifiable identifiers for the lines it wants to change.
