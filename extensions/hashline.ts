@@ -551,7 +551,8 @@ export default function (pi: ExtensionAPI) {
 		promptGuidelines: [
 			"Use hashline_edit when you want to change files by referencing line anchors (LINE+HASH) shown in read output.",
 			`Format: start with ${HL_FILE_PREFIX}PATH, then operations: ${HL_OP_INSERT_AFTER}ANCHOR (insert after), ${HL_OP_INSERT_BEFORE}ANCHOR (insert before), or ${HL_OP_REPLACE}START..END (replace range).`,
-			"Copy anchors exactly as shown in read output (e.g. 42ab, not just ab).",
+			"Anchors are LINE+HASH with no separator (e.g. 42ab, not 42:ab). Copy them exactly from read output.",
+			"For replace ranges, both START and END use the same LINE+HASH format joined by two dots (..).",
 			"Payload lines follow each operation and end at the next operation or EOF.",
 			"Use BOF and EOF for insertions at the start or end of a file.",
 			"Multiple operations on the same file are allowed in one call.",
