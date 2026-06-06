@@ -491,6 +491,28 @@ function patchReadResult(text: string, offset: number): string {
 
 export default function (pi: ExtensionAPI) {
 	// ---------------------------------------------------------------------------
+	// Suppress the native edit tool so only hashline_edit is available for edits.
+	// ---------------------------------------------------------------------------
+	pi.on("session_start", async () => {
+		const allTools = pi.getAllTools();
+		const withoutEdit = allTools.map((t) => t.name).filter((n) => n !== "edit");
+		pi.setActiveTools(withoutEdit);
+	});
+
+	// ---------------------------------------------------------------------------
+	// Enforce hashline_edit priority in the system prompt.
+	// ---------------------------------------------------------------------------
+	pi.on("before_agent_start", async (event) => {
+		return {
+			systemPrompt:
+				event.systemPrompt +
+				"\n\n## Editing Policy\n" +
+				"- For ALL file edits, use `hashline_edit` exclusively.\n" +
+				"- The `edit` tool is unavailable; do not attempt to use it.",
+		};
+	});
+
+	// ---------------------------------------------------------------------------
 	// Intercept read tool results and decorate text file content with hashline
 	// anchors so the model can reference lines precisely without reproducing them.
 	// ---------------------------------------------------------------------------
