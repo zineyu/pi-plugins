@@ -23,5 +23,8 @@
 		"extensions": [
 			"./packages/pi-hashline/src/hashline.ts"
 		]
+	},
+	"dependencies": {
+		"diff": "^9.0.0"
 	}
 }

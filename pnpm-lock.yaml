@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      diff:
+        specifier: ^9.0.0
+        version: 9.0.0
     devDependencies:
       prettier:
         specifier: ^3.3.3
