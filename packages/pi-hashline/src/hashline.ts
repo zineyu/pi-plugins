@@ -14,6 +14,7 @@ import { applyEdits } from "./apply.js";
 import { attemptRecovery } from "./recovery.js";
 import { HashlineError } from "./error.js";
 import { snapshotTag } from "./xxhash32.js";
+import { formatDiff } from "./diff-display.js";
 
 // =============================================================================
 // Helpers
@@ -251,12 +252,16 @@ export default function (pi: ExtensionAPI) {
 				// Record the new version so subsequent edits can use its snapshot.
 				const newText = normalizeEol(finalContent).content;
 				snapshotStore.record(absolutePath, newText);
-
+				const diffDisplay = formatDiff(content, resultText);
 				const text = warning ? `${warning}\nUpdated ${filePath}.` : `Updated ${filePath}.`;
 
 				return {
 					content: [{ type: "text", text }],
-					details: { recovered },
+					details: {
+						recovered,
+						diff: diffDisplay.diff,
+						firstChangedLine: diffDisplay.firstChangedLine,
+					},
 				};
 			});
 		},

@@ -1,0 +1,9 @@
+task_root: .agent/tasks
+archive_root: .agent/archive
+current_task_file: .agent/current-task
+runtime_root: .agent/runtime
+vcs: jj
+require_clean_working_copy_on_finish: true
+project_memory_targets:
+  - AGENTS.md
+  - docs/adr
