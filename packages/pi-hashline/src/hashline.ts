@@ -3,425 +3,35 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { readFile, writeFile, access } from "node:fs/promises";
-import { constants } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve, isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { type Filesystem, NodeFilesystem } from "./filesystem.js";
+import { SnapshotStore } from "./snapshot-store.js";
+import { parsePatch } from "./executor.js";
+import { applyEdits } from "./apply.js";
+import { attemptRecovery } from "./recovery.js";
+import { HashlineError } from "./error.js";
+import { snapshotTag } from "./xxhash32.js";
 
 // =============================================================================
-// Hashline constants and helpers
+// Helpers
 // =============================================================================
 
-const HL_OP_INSERT_BEFORE = "«";
-const HL_OP_INSERT_AFTER = "»";
-const HL_OP_REPLACE = "≔";
-const HL_FILE_PREFIX = "§";
-const HL_BODY_SEP = "|";
-const RANGE_INTERIOR_HASH = "**";
+const snapshotStore = new SnapshotStore();
 
-// Generate aa..zz bigrams (676 combinations).
-const HL_BIGRAMS: readonly string[] = Array.from({ length: 26 }, (_, i) =>
-	Array.from({ length: 26 }, (_, j) => String.fromCharCode(97 + i) + String.fromCharCode(97 + j)),
-).flat();
-const HL_BIGRAM_COUNT = HL_BIGRAMS.length;
-
-/**
- * Compute a 2-character hash of a single line via FNV-1a mod 676.
- * The hash depends only on the line's content (after stripping CR and trailing
- * whitespace). The `idx` parameter is accepted for call-site symmetry but is
- * intentionally unused so anchors remain stable across line shifts.
- */
-function computeLineHash(_idx: number, line: string): string {
-	void _idx;
-	const normalized = line.replace(/\r/g, "").trimEnd();
-	let h = 2166136261;
-	for (let i = 0; i < normalized.length; i++) {
-		h ^= normalized.charCodeAt(i);
-		h = Math.imul(h, 16777619);
-	}
-	return HL_BIGRAMS[(h >>> 0) % HL_BIGRAM_COUNT];
+function normalizeEol(text: string): { content: string; lineEnding: string; hasBom: boolean } {
+	const hasBom = text.startsWith("\uFEFF");
+	const content = hasBom ? text.slice(1) : text;
+	const lineEnding = content.includes("\r\n") ? "\r\n" : "\n";
+	return { content: content.replace(/\r\n/g, "\n"), lineEnding, hasBom };
 }
 
-function formatLineHash(lineNum: number, line: string): string {
-	return `${lineNum}${computeLineHash(lineNum, line)}`;
+function restoreEol(text: string, lineEnding: string, hasBom: boolean): string {
+	return (hasBom ? "\uFEFF" : "") + text.replace(/\n/g, lineEnding);
 }
 
-function formatHashLine(lineNum: number, line: string): string {
-	return `${formatLineHash(lineNum, line)}${HL_BODY_SEP}${line}`;
-}
-
-function formatHashLines(text: string, startLine = 1): string {
-	const lines = text.split("\n");
-	return lines.map((line, i) => formatHashLine(startLine + i, line)).join("\n");
-}
-
-// =============================================================================
-// Parser
-// =============================================================================
-
-interface Anchor {
-	line: number;
-	hash: string;
-}
-
-type HashlineCursor =
-	| { kind: "bof" }
-	| { kind: "eof" }
-	| { kind: "before_anchor"; anchor: Anchor }
-	| { kind: "after_anchor"; anchor: Anchor };
-
-type HashlineEdit =
-	| {
-			kind: "insert";
-			cursor: HashlineCursor;
-			text: string;
-			lineNum: number;
-			index: number;
-	  }
-	| { kind: "delete"; anchor: Anchor; lineNum: number; index: number };
-
-function parseAnchor(raw: string, lineNum: number): Anchor {
-	const match = raw.match(/^(\d+)([a-z]{2})$/i);
-	if (!match) {
-		throw new Error(
-			`line ${lineNum}: invalid anchor "${raw}". Expected format like "42ab" (line number + 2-char hash).`,
-		);
-	}
-	return { line: parseInt(match[1], 10), hash: match[2].toLowerCase() };
-}
-
-function parseRange(raw: string, lineNum: number): { start: Anchor; end: Anchor } {
-	if (!raw.includes("..")) {
-		const a = parseAnchor(raw, lineNum);
-		return { start: a, end: { ...a } };
-	}
-	const [startRaw, endRaw] = raw.split("..");
-	if (!startRaw || !endRaw) {
-		throw new Error(`line ${lineNum}: invalid range "${raw}". Use "START..END" format.`);
-	}
-	const start = parseAnchor(startRaw, lineNum);
-	const end = parseAnchor(endRaw, lineNum);
-	if (end.line < start.line) {
-		throw new Error(`line ${lineNum}: range ends before it starts.`);
-	}
-	return { start, end };
-}
-
-function parseCursor(raw: string, lineNum: number, kind: "before" | "after"): HashlineCursor {
-	if (raw === "BOF") return { kind: "bof" };
-	if (raw === "EOF") return { kind: "eof" };
-	const cursorKind = kind === "before" ? "before_anchor" : "after_anchor";
-	return { kind: cursorKind, anchor: parseAnchor(raw, lineNum) };
-}
-
-function isPayloadTerminator(line: string): boolean {
-	if (line.length === 0) return false;
-	const first = line[0];
-	return (
-		first === HL_FILE_PREFIX ||
-		first === HL_OP_INSERT_BEFORE ||
-		first === HL_OP_INSERT_AFTER ||
-		first === HL_OP_REPLACE
-	);
-}
-
-function cloneCursor(cursor: HashlineCursor): HashlineCursor {
-	if (cursor.kind === "before_anchor")
-		return { kind: "before_anchor", anchor: { ...cursor.anchor } };
-	if (cursor.kind === "after_anchor") return { kind: "after_anchor", anchor: { ...cursor.anchor } };
-	return cursor;
-}
-
-function parseHashline(diff: string): HashlineEdit[] {
-	const edits: HashlineEdit[] = [];
-	const lines = diff.split(/\r?\n/);
-	if (diff.endsWith("\n") && lines[lines.length - 1] === "") lines.pop();
-
-	let editIndex = 0;
-
-	for (let i = 0; i < lines.length; ) {
-		const lineNum = i + 1;
-		const line = lines[i];
-
-		if (line.trim().length === 0) {
-			i++;
-			continue;
-		}
-
-		if (line.startsWith(HL_FILE_PREFIX)) {
-			i++;
-			continue;
-		}
-
-		const insertBeforeMatch = line.match(/^«\s*(\S+)(?:\|(.*))?\s*$/);
-		if (insertBeforeMatch) {
-			const cursor = parseCursor(insertBeforeMatch[1], lineNum, "before");
-			const payload: string[] = [];
-			i++;
-			while (i < lines.length && !isPayloadTerminator(lines[i])) {
-				payload.push(lines[i]);
-				i++;
-			}
-			if (payload.length === 0) {
-				throw new Error(`line ${lineNum}: « requires at least one payload line.`);
-			}
-			for (const text of payload) {
-				edits.push({
-					kind: "insert",
-					cursor: cloneCursor(cursor),
-					text,
-					lineNum,
-					index: editIndex++,
-				});
-			}
-			continue;
-		}
-
-		const insertAfterMatch = line.match(/^»\s*(\S+)(?:\|(.*))?\s*$/);
-		if (insertAfterMatch) {
-			const cursor = parseCursor(insertAfterMatch[1], lineNum, "after");
-			const payload: string[] = [];
-			i++;
-			while (i < lines.length && !isPayloadTerminator(lines[i])) {
-				payload.push(lines[i]);
-				i++;
-			}
-			if (payload.length === 0) {
-				throw new Error(`line ${lineNum}: » requires at least one payload line.`);
-			}
-			for (const text of payload) {
-				edits.push({
-					kind: "insert",
-					cursor: cloneCursor(cursor),
-					text,
-					lineNum,
-					index: editIndex++,
-				});
-			}
-			continue;
-		}
-
-		const replaceMatch = line.match(/^≔\s*(\S+)\s*$/);
-		if (replaceMatch) {
-			const range = parseRange(replaceMatch[1], lineNum);
-			const payload: string[] = [];
-			i++;
-			while (i < lines.length && !isPayloadTerminator(lines[i])) {
-				payload.push(lines[i]);
-				i++;
-			}
-			for (const text of payload) {
-				edits.push({
-					kind: "insert",
-					cursor: { kind: "before_anchor", anchor: { ...range.start } },
-					text,
-					lineNum,
-					index: editIndex++,
-				});
-			}
-			for (let l = range.start.line; l <= range.end.line; l++) {
-				const hash =
-					l === range.start.line
-						? range.start.hash
-						: l === range.end.line
-							? range.end.hash
-							: RANGE_INTERIOR_HASH;
-				edits.push({
-					kind: "delete",
-					anchor: { line: l, hash },
-					lineNum,
-					index: editIndex++,
-				});
-			}
-			continue;
-		}
-
-		throw new Error(
-			`line ${lineNum}: unrecognized op "${line}". Use ${HL_OP_INSERT_BEFORE}ANCHOR (insert before), ${HL_OP_INSERT_AFTER}ANCHOR (insert after), or ${HL_OP_REPLACE}RANGE (replace/delete).`,
-		);
-	}
-
-	return edits;
-}
-
-// =============================================================================
-// Apply
-// =============================================================================
-
-interface HashlineApplyResult {
-	lines: string;
-	firstChangedLine?: number;
-}
-
-class HashlineMismatchError extends Error {
-	constructor(
-		public readonly mismatches: Array<{
-			line: number;
-			expected: string;
-			actual: string;
-		}>,
-		public readonly fileLines: string[],
-	) {
-		super(`Hash mismatch on line(s): ${mismatches.map((m) => m.line).join(", ")}`);
-		this.name = "HashlineMismatchError";
-	}
-
-	get displayMessage(): string {
-		const out: string[] = [
-			`Edit rejected: ${this.mismatches.length} anchor(s) do not match the current file (marked *).`,
-			"The edit was NOT applied. Please re-read the file and issue another edit.",
-			"",
-		];
-		const mismatchSet = new Set(this.mismatches.map((m) => m.line));
-		for (let i = 0; i < this.fileLines.length; i++) {
-			const lineNum = i + 1;
-			if (
-				mismatchSet.has(lineNum) ||
-				this.mismatches.some((m) => Math.abs(m.line - lineNum) <= 2)
-			) {
-				const marker = mismatchSet.has(lineNum) ? "*" : " ";
-				const hash = computeLineHash(lineNum, this.fileLines[i]);
-				out.push(`${marker}${lineNum}${hash}${HL_BODY_SEP}${this.fileLines[i]}`);
-			}
-		}
-		return out.join("\n");
-	}
-}
-
-function validateAnchors(edits: HashlineEdit[], fileLines: string[]): void {
-	const mismatches: Array<{ line: number; expected: string; actual: string }> = [];
-	for (const edit of edits) {
-		const anchors: Anchor[] = [];
-		if (edit.kind === "delete") anchors.push(edit.anchor);
-		else if (edit.cursor.kind === "before_anchor" || edit.cursor.kind === "after_anchor")
-			anchors.push(edit.cursor.anchor);
-
-		for (const anchor of anchors) {
-			if (anchor.line < 1 || anchor.line > fileLines.length) {
-				throw new Error(`Line ${anchor.line} does not exist (file has ${fileLines.length} lines)`);
-			}
-			if (anchor.hash === RANGE_INTERIOR_HASH) continue;
-			const actual = computeLineHash(anchor.line, fileLines[anchor.line - 1] ?? "");
-			if (actual !== anchor.hash) {
-				mismatches.push({ line: anchor.line, expected: anchor.hash, actual });
-			}
-		}
-	}
-	if (mismatches.length > 0) {
-		throw new HashlineMismatchError(mismatches, fileLines);
-	}
-}
-
-function applyHashlineEdits(text: string, edits: HashlineEdit[]): HashlineApplyResult {
-	if (edits.length === 0) return { lines: text };
-
-	const fileLines = text.split("\n");
-	validateAnchors(edits, fileLines);
-
-	// Normalize after_anchor -> before_anchor of next line, or EOF.
-	const normalizedEdits: HashlineEdit[] = edits.map((e) => {
-		if (e.kind !== "insert" || e.cursor.kind !== "after_anchor") return e;
-		const anchorLine = e.cursor.anchor.line;
-		if (anchorLine >= fileLines.length) {
-			return {
-				kind: "insert",
-				cursor: { kind: "eof" },
-				text: e.text,
-				lineNum: e.lineNum,
-				index: e.index,
-			};
-		}
-		const nextLineNum = anchorLine + 1;
-		return {
-			kind: "insert",
-			cursor: {
-				kind: "before_anchor",
-				anchor: {
-					line: nextLineNum,
-					hash: computeLineHash(nextLineNum, fileLines[nextLineNum - 1]),
-				},
-			},
-			text: e.text,
-			lineNum: e.lineNum,
-			index: e.index,
-		};
-	});
-
-	const bofLines: string[] = [];
-	const eofLines: string[] = [];
-	const anchorEdits: Array<{ edit: HashlineEdit; idx: number }> = [];
-
-	normalizedEdits.forEach((edit, idx) => {
-		if (edit.kind === "insert" && edit.cursor.kind === "bof") bofLines.push(edit.text);
-		else if (edit.kind === "insert" && edit.cursor.kind === "eof") eofLines.push(edit.text);
-		else anchorEdits.push({ edit, idx });
-	});
-
-	// Bucket by target line.
-	const byLine = new Map<number, Array<{ edit: HashlineEdit; idx: number }>>();
-	for (const entry of anchorEdits) {
-		const line =
-			entry.edit.kind === "delete"
-				? entry.edit.anchor.line
-				: entry.edit.cursor.kind === "before_anchor"
-					? entry.edit.cursor.anchor.line
-					: 0;
-		if (line === 0) continue;
-		const bucket = byLine.get(line);
-		if (bucket) bucket.push(entry);
-		else byLine.set(line, [entry]);
-	}
-
-	let firstChangedLine: number | undefined;
-
-	// Apply bottom-up so earlier indices stay valid.
-	for (const line of [...byLine.keys()].sort((a, b) => b - a)) {
-		const bucket = byLine.get(line);
-		if (!bucket) continue;
-		bucket.sort((a, b) => a.idx - b.idx);
-
-		const idx = line - 1;
-		const beforeLines: string[] = [];
-		let deleteLine = false;
-
-		for (const { edit } of bucket) {
-			if (edit.kind === "insert") beforeLines.push(edit.text);
-			else if (edit.kind === "delete") deleteLine = true;
-		}
-
-		const replacement = deleteLine ? beforeLines : [...beforeLines, fileLines[idx]];
-		fileLines.splice(idx, 1, ...replacement);
-		if (firstChangedLine === undefined || line < firstChangedLine) firstChangedLine = line;
-	}
-
-	if (bofLines.length > 0) {
-		if (fileLines.length === 1 && fileLines[0] === "") {
-			fileLines.splice(0, 1, ...bofLines);
-		} else {
-			fileLines.splice(0, 0, ...bofLines);
-		}
-		if (firstChangedLine === undefined) firstChangedLine = 1;
-	}
-
-	if (eofLines.length > 0) {
-		const hasTrailingNewline = fileLines.length > 0 && fileLines[fileLines.length - 1] === "";
-		const insertIndex = hasTrailingNewline ? fileLines.length - 1 : fileLines.length;
-		fileLines.splice(insertIndex, 0, ...eofLines);
-		if (firstChangedLine === undefined || insertIndex + 1 < firstChangedLine)
-			firstChangedLine = insertIndex + 1;
-	}
-
-	return { lines: fileLines.join("\n"), firstChangedLine };
-}
-
-// =============================================================================
-// Read output patching
-// =============================================================================
-
-/**
- * Detect whether a read result text ends with a continuation hint produced by
- * the built-in read tool.  If so, split into file content + hint so we can
- * hashline-format only the actual file content.
- */
 function splitReadText(text: string): { fileText: string; hint: string } {
 	const hintRe = /\n\n\[(Showing lines|First line exceeds|Line \d+ is|\d+ more lines in file)/;
 	const match = text.match(hintRe);
@@ -434,10 +44,28 @@ function splitReadText(text: string): { fileText: string; hint: string } {
 	};
 }
 
-function patchReadResult(text: string, offset: number): string {
-	const { fileText, hint } = splitReadText(text);
-	const hashed = formatHashLines(fileText, offset);
-	return hashed + hint;
+function decorateReadResult(filePath: string, fileText: string, offset: number): string {
+	const normalizedText = fileText.replace(/\r\n/g, "\n");
+	const hash = snapshotTag(normalizedText);
+	snapshotStore.record(filePath, normalizedText);
+
+	const lines = normalizedText.split("\n");
+	const decorated = lines.map((line, i) => `${offset + i}:${line}`).join("\n");
+	return `[${filePath}#${hash}]\n${decorated}`;
+}
+
+function resolvePath(filePath: string, cwd: string): string {
+	return isAbsolute(filePath) ? filePath : resolve(cwd, filePath);
+}
+
+function loadPromptText(): string {
+	try {
+		const __filename = fileURLToPath(import.meta.url);
+		const promptPath = resolve(__filename, "../prompt.md");
+		return readFileSync(promptPath, "utf-8");
+	} catch {
+		return "Edit a single file using the hashline patch syntax: [PATH#HASH] header, replace/insert/delete operations, and payload lines prefixed with '+'.";
+	}
 }
 
 // =============================================================================
@@ -445,6 +73,8 @@ function patchReadResult(text: string, offset: number): string {
 // =============================================================================
 
 export default function (pi: ExtensionAPI) {
+	const fs: Filesystem = new NodeFilesystem(pi.cwd ?? process.cwd());
+
 	// ---------------------------------------------------------------------------
 	// Suppress the native edit tool so only hashline_edit is available for edits.
 	// ---------------------------------------------------------------------------
@@ -455,13 +85,27 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	// ---------------------------------------------------------------------------
-	// Intercept read tool results and decorate text file content with hashline
-	// anchors so the model can reference lines precisely without reproducing them.
+	// Contribute syntax documentation via resources_discover.
+	// ---------------------------------------------------------------------------
+	pi.on("resources_discover", async () => {
+		return {
+			resources: [
+				{
+					uri: "hashline://syntax",
+					name: "Hashline Edit Syntax",
+					mimeType: "text/markdown",
+					text: loadPromptText(),
+				},
+			],
+		};
+	});
+
+	// ---------------------------------------------------------------------------
+	// Intercept read tool results and decorate text file content.
 	// ---------------------------------------------------------------------------
 	pi.on("tool_result", async (event) => {
 		if (event.toolName !== "read") return;
 
-		// Skip image reads.
 		const hasImage = event.content.some((c) => c.type === "image");
 		if (hasImage) return;
 
@@ -473,9 +117,33 @@ export default function (pi: ExtensionAPI) {
 			offset?: number;
 			limit?: number;
 		};
-		const offset = input.offset ?? 1;
+		const filePath = input.path;
+		if (!filePath) return;
 
-		textPart.text = patchReadResult(textPart.text, offset);
+		const absolutePath = resolvePath(filePath, pi.cwd ?? process.cwd());
+
+		// If the read was truncated, we need the full file to compute a reliable
+		// snapshot. Otherwise we can decorate the returned text directly.
+		const isTruncated =
+			textPart.text.includes("\n\n[Showing lines") ||
+			textPart.text.includes("\n\n[First line exceeds") ||
+			textPart.text.includes("\n\n[Line ") ||
+			/\n\n\d+ more lines in file/.test(textPart.text);
+
+		let fileText: string;
+		let hint = "";
+		if (isTruncated) {
+			fileText = await fs.readText(absolutePath);
+			const split = splitReadText(textPart.text);
+			hint = split.hint;
+		} else {
+			const split = splitReadText(textPart.text);
+			fileText = split.fileText;
+			hint = split.hint;
+		}
+
+		const offset = input.offset ?? 1;
+		textPart.text = decorateReadResult(absolutePath, fileText, offset) + hint;
 
 		return { content: event.content };
 	});
@@ -487,21 +155,23 @@ export default function (pi: ExtensionAPI) {
 		name: "hashline_edit",
 		label: "Hashline Edit",
 		description:
-			"Edit a single file using hashline anchors. When the model reads a file, every line comes back tagged with a 2-character content hash (e.g. 42ab|content). To edit, reference those anchors — no need to reproduce old text exactly.",
-		promptSnippet: "Edit files by referencing line hash anchors instead of exact text replacement",
+			"Edit a single text file using a line-anchored patch. Reads return a [PATH#HASH] header and LINE: prefixes; edits reference that header and line numbers.",
+		promptSnippet:
+			"Edit files using [PATH#HASH] snapshot headers and replace/insert/delete operations.",
 		promptGuidelines: [
-			"Use hashline_edit when you want to change files by referencing line anchors (LINE+HASH) shown in read output.",
-			`Format: start with ${HL_FILE_PREFIX}PATH, then operations: ${HL_OP_INSERT_AFTER}ANCHOR (insert after), ${HL_OP_INSERT_BEFORE}ANCHOR (insert before), or ${HL_OP_REPLACE}START..END (replace range).`,
-			"Anchors are LINE+HASH with no separator (e.g. 42ab, not 42:ab). Copy them exactly from read output.",
-			"For replace ranges, both START and END use the same LINE+HASH format joined by two dots (..).",
-			"Payload lines follow each operation and end at the next operation or EOF.",
-			"Use BOF and EOF for insertions at the start or end of a file.",
-			"Multiple operations on the same file are allowed in one call.",
+			"Use hashline_edit to change a single text file per call.",
+			"Start the patch with [PATH#HASH], copying the header shown in read output.",
+			"Operations: replace N..M:, replace N:, insert before N:, insert after N:, insert head:, insert tail:, delete N, delete N..M.",
+			"Payload lines must start with '+'. A single '+' inserts an empty line.",
+			"replace and insert require at least one payload line; delete must not have payload lines.",
+			"Do not use the old §, » («), ≔ operators; they are no longer supported.",
+			"If you get a stale_snapshot error, re-read the file and try again.",
 		],
 		parameters: Type.Object(
 			{
 				input: Type.String({
-					description: `Hashline patch text. Starts with ${HL_FILE_PREFIX}PATH, followed by edit ops and payload lines.`,
+					description:
+						'Hashline patch text. Starts with [PATH#HASH], followed by operations and payload lines prefixed with "+".',
 				}),
 				path: Type.Optional(
 					Type.String({
@@ -514,59 +184,57 @@ export default function (pi: ExtensionAPI) {
 		async execute(_toolCallId, params, signal, _onUpdate, ctx: ExtensionContext) {
 			const { input, path: explicitPath } = params;
 
-			// Extract file path from the first § header.
-			const lines = input.split(/\r?\n/);
-			let filePath: string | undefined;
-			let opStart = 0;
-			for (let i = 0; i < lines.length; i++) {
-				const line = lines[i];
-				if (line.startsWith(HL_FILE_PREFIX)) {
-					filePath = line.slice(1).trim();
-					opStart = i + 1;
-					break;
-				}
-			}
-			if (!filePath && explicitPath) filePath = explicitPath;
-			if (!filePath) {
-				throw new Error(
-					`No file path found. Start the patch with "${HL_FILE_PREFIX}PATH" or provide the path parameter.`,
-				);
-			}
-
-			const absolutePath = resolve(ctx.cwd, filePath);
+			const patch = parsePatch(input);
+			const filePath = patch.path;
+			const absolutePath = explicitPath
+				? resolvePath(explicitPath, ctx.cwd)
+				: resolvePath(filePath, ctx.cwd);
 
 			return withFileMutationQueue(absolutePath, async () => {
-				// Verify file exists and is accessible.
+				let rawContent: string;
 				try {
-					await access(absolutePath, constants.R_OK | constants.W_OK);
-				} catch {
-					throw new Error(`Cannot access file: ${filePath}`);
+					rawContent = await fs.readText(absolutePath);
+				} catch (err) {
+					const code = (err as NodeJS.ErrnoException).code;
+					if (code === "ENOENT" || (err as Error).message?.includes("ENOENT")) {
+						throw new HashlineError("file_not_found", `File not found: ${filePath}`, {
+							source: filePath,
+						});
+					}
+					throw new HashlineError("file_access_denied", `Cannot access file: ${filePath}`, {
+						source: filePath,
+					});
 				}
 
 				if (signal?.aborted) {
 					throw new Error("Operation aborted");
 				}
 
-				// Read file.
-				const buffer = await readFile(absolutePath);
-				const rawContent = buffer.toString("utf-8");
-				const hasBom = rawContent.startsWith("\uFEFF");
-				const content = hasBom ? rawContent.slice(1) : rawContent;
+				const { content, lineEnding, hasBom } = normalizeEol(rawContent);
+				const actualHash = snapshotTag(content);
 
-				// Preserve original line endings.
-				const lineEnding = content.includes("\r\n") ? "\r\n" : "\n";
-				const normalizedContent = content.replace(/\r\n/g, "\n");
+				let resultText: string;
+				let recovered = false;
+				let warning: string | undefined;
 
-				if (signal?.aborted) {
-					throw new Error("Operation aborted");
+				if (actualHash === patch.expectedHash) {
+					const result = applyEdits(content, patch.edits);
+					resultText = result.text;
+				} else {
+					const recovery = attemptRecovery(
+						absolutePath,
+						patch.expectedHash,
+						content,
+						actualHash,
+						patch.edits,
+						snapshotStore,
+					);
+					resultText = recovery.text;
+					recovered = recovery.recovered;
+					warning = recovery.warning;
 				}
 
-				// Parse and apply edits.
-				const diffText = lines.slice(opStart).join("\n");
-				const edits = parseHashline(diffText);
-				const result = applyHashlineEdits(normalizedContent, edits);
-
-				if (normalizedContent === result.lines) {
+				if (resultText === content) {
 					return {
 						content: [{ type: "text", text: `No changes made to ${filePath}.` }],
 						details: {},
@@ -577,18 +245,18 @@ export default function (pi: ExtensionAPI) {
 					throw new Error("Operation aborted");
 				}
 
-				// Write back with original line endings and BOM preserved.
-				const finalContent = (hasBom ? "\uFEFF" : "") + result.lines.replace(/\n/g, lineEnding);
-				await writeFile(absolutePath, finalContent, "utf-8");
+				const finalContent = restoreEol(resultText, lineEnding, hasBom);
+				await fs.writeText(absolutePath, finalContent);
+
+				// Record the new version so subsequent edits can use its snapshot.
+				const newText = normalizeEol(finalContent).content;
+				snapshotStore.record(absolutePath, newText);
+
+				const text = warning ? `${warning}\nUpdated ${filePath}.` : `Updated ${filePath}.`;
 
 				return {
-					content: [
-						{
-							type: "text",
-							text: `Updated ${filePath} (${edits.length} edit ops applied).`,
-						},
-					],
-					details: { firstChangedLine: result.firstChangedLine },
+					content: [{ type: "text", text }],
+					details: { recovered },
 				};
 			});
 		},

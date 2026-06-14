@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> pi-hashline — a pi extension that provides line-anchored file edits via content hashes (FNV-1a), replacing traditional `str_replace`.
+> pi-hashline — a pi extension that provides line-anchored file edits via file snapshot tags (xxHash32), replacing traditional `str_replace` and the old `§»«≔` hashline syntax.
 
 ## Entry point
 
@@ -8,29 +8,38 @@
 
 ## Key behaviors
 
-- **Decorates `read` results**: text files are rewritten so each line is prefixed with `LINE+HASH|`.
-- **Registers `hashline_edit`**: accepts patch text starting with `§PATH`, followed by `»`, `«`, or `≔` operations.
+- **Decorates `read` results**: text files are rewritten with a `[PATH#HASH]` snapshot header and `LINE:` line prefixes.
+- **Registers `hashline_edit`**: accepts patch text starting with `[PATH#HASH]`, followed by `replace`, `insert`, or `delete` operations.
 - **Suppresses native `edit` tool**: on `session_start`, the native `edit` tool is removed from active tools so only `hashline_edit` is available.
+- **Recovers from drift**: when the current file does not match the expected snapshot, the extension attempts a three-way merge from a recent in-memory version stored in `SnapshotStore`.
 
-## Anchor format
+## Snapshot tag
 
-- Anchors are `LINE` + 2-character lowercase hash, e.g. `42ab`.
-- Hashes are computed from the line content after stripping `\r` and trailing whitespace.
-- Line number is not part of the hash; anchors remain stable when content is unchanged.
+- Snapshot tags are 4-character uppercase hexadecimal hashes, e.g. `A1B2`.
+- They are computed from the entire LF-normalized file content using an embedded pure-JavaScript xxHash32 implementation.
+- Tags are computed when `read` output is decorated and updated after each successful `hashline_edit`.
 
-## Operations
+## Patch syntax
 
-- `»ANCHOR` — insert payload after the anchored line (`EOF` allowed).
-- `«ANCHOR` — insert payload before the anchored line (`BOF` allowed).
-- `≔START..END` — replace the inclusive range. If no payload follows, the range is deleted.
+- Header: `[PATH#HASH]`.
+- Operations:
+  - `replace N..M:` / `replace N:`
+  - `insert before N:` / `insert after N:` / `insert head:` / `insert tail:`
+  - `delete N` / `delete N..M`
+- Payload lines start with `+`; a single `+` inserts an empty line.
+- `replace` and `insert` require at least one payload line.
+- `delete` must not have payload lines.
+- Only one file section per patch is allowed.
 
 ## Safety
 
-- Before applying edits, every referenced anchor hash is validated against the current file.
-- On mismatch, a `HashlineMismatchError` is thrown and the file is NOT modified.
+- Before applying edits, the file snapshot is validated against the patch header.
+- On mismatch, `attemptRecovery` tries to merge the edit from a historical snapshot using `diff`.
+- If recovery fails, a `HashlineError` with code `stale_snapshot` is thrown and the file is NOT modified.
 - Edits are wrapped with `withFileMutationQueue` to serialize concurrent writes to the same file.
 
 ## References
 
 - `README.md` — user-facing install and usage guide
 - `src/hashline.ts` — extension implementation
+- `src/prompt.md` — model-visible syntax reference
