@@ -21,7 +21,8 @@
 	},
 	"pi": {
 		"extensions": [
-			"./packages/pi-hashline/src/hashline.ts"
+			"./packages/pi-hashline/src/hashline.ts",
+			"./packages/pi-context-compact/src/context-compact.ts"
 		]
 	},
 	"dependencies": {

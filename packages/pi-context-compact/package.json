@@ -1,0 +1,33 @@
+{
+	"name": "@zineyu/pi-context-compact",
+	"version": "0.1.0",
+	"description": "Context compaction trigger tool for pi agents",
+	"keywords": [
+		"pi-package"
+	],
+	"license": "MIT",
+	"author": "zineyu",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/zineyu/pi-plugins.git",
+		"directory": "packages/pi-context-compact"
+	},
+	"files": [
+		"src",
+		"README.md"
+	],
+	"scripts": {
+		"format": "prettier --write .",
+		"format:check": "prettier --check ."
+	},
+	"pi": {
+		"extensions": [
+			"./src/context-compact.ts"
+		]
+	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "^0.79.3",
+		"@types/node": "^25.9.3",
+		"typescript": "^6.0.3"
+	}
+}

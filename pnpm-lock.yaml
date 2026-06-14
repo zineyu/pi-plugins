@@ -16,6 +16,18 @@ importers:
         specifier: ^3.3.3
         version: 3.8.4
 
+  packages/pi-context-compact:
+    devDependencies:
+      '@earendil-works/pi-coding-agent':
+        specifier: ^0.79.3
+        version: 0.79.3(ws@8.21.0)(zod@4.4.3)
+      '@types/node':
+        specifier: ^25.9.3
+        version: 25.9.3
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   packages/pi-hashline:
     dependencies:
       diff:
