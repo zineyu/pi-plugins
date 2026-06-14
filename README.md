@@ -1,24 +1,12 @@
-# pi-hashline
+# pi-plugins
 
-Hashline edit tool for [pi](https://pi.dev) — line-anchored file edits via content hashes, inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi).
+Monorepo for pi extensions, managed with pnpm workspaces.
 
-## What is Hashline?
+## Extensions
 
-When a model reads a file, every line comes back tagged with a 2-character content hash:
-
-```
-11:a3|function hello() {
-22:f1|  return "world";
-33:0e|}
-```
-
-To edit, the model references those anchors instead of reproducing old text exactly:
-
-- `»ANCHOR` — insert after the anchored line (or `EOF`)
-- `«ANCHOR` — insert before the anchored line (or `BOF`)
-- `≔START..END` — replace the inclusive range (delete if no payload follows)
-
-If the file changed since the last read, the hashes won't match and the edit is rejected before anything gets corrupted.
+| Package                                         | Description                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| [`@zineyu/pi-hashline`](./packages/pi-hashline) | Hashline edit tool — line-anchored file edits via content hashes |
 
 ## Install
 
@@ -26,32 +14,21 @@ If the file changed since the last read, the hashes won't match and the edit is 
 pi install git:github.com/zineyu/pi-plugins
 ```
 
-Or clone into your pi extensions directory:
+This loads every extension listed in the root `package.json` `pi.extensions` field.
+
+## Development
 
 ```bash
-cd ~/.pi/agent/extensions
-git clone https://github.com/zineyu/pi-plugins.git pi-hashline
+# Install workspace dependencies
+pnpm install
+
+# Format all packages
+pnpm format
+
+# Check formatting
+pnpm format:check
 ```
 
-## Usage
+## License
 
-Once loaded, the extension does two things:
-
-1. **Decorates `read` output** with `LINE+HASH|` prefixes so the model sees anchors automatically.
-2. **Registers a `hashline_edit` tool** that accepts patch text in hashline format.
-
-Example patch:
-
-```
-§src/main.ts
-≔11:a3..11:a3
-function hi() {
-  return "universe";
-}
-»33:0e
-console.log("done");
-```
-
-## Why?
-
-Traditional `str_replace` requires the model to reproduce every character perfectly — including whitespace and indentation. Hashline eliminates that failure mode by giving the model stable, verifiable identifiers for the lines it wants to change.
+MIT

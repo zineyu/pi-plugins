@@ -1,0 +1,28 @@
+{
+	"name": "@zineyu/pi-hashline",
+	"version": "0.1.0",
+	"description": "Hashline edit tool for pi — line-anchored file edits via content hashes",
+	"keywords": [
+		"pi-package"
+	],
+	"license": "MIT",
+	"author": "zineyu",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/zineyu/pi-plugins.git",
+		"directory": "packages/pi-hashline"
+	},
+	"files": [
+		"src",
+		"README.md",
+		"AGENTS.md"
+	],
+	"pi": {
+		"extensions": [
+			"./src/hashline.ts"
+		]
+	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "^0.79.3"
+	}
+}

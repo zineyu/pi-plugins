@@ -1,32 +1,53 @@
 # AGENTS.md
 
-> pi-hashline — 一个 pi 扩展，通过 FNV-1a 内容哈希实现行锚定文件编辑（hashline edit），替代传统的 `str_replace`。
+> pi-plugins — monorepo for pi extensions.
+
+## Repository structure
+
+```
+packages/
+  pi-hashline/    pi extension: hashline edit tool
+package.json      workspace root (private)
+pnpm-workspace.yaml
+.prettierrc
+```
 
 ## Build & Test
 
-- 无构建步骤（扩展由 pi 通过 jiti 在运行时加载）
-- 无测试框架（当前为单一扩展文件）
+- Extensions are loaded by pi via `jiti` at runtime. No build step is required.
+- Run `pnpm install` to install workspace dependencies and generate `pnpm-lock.yaml`.
+- Run `pnpm format` / `pnpm format:check` to format or verify formatting across the workspace.
 
 ## Code Style
 
-- 代码注释使用英文
-- Formatter: Prettier（配置见 `.prettierrc`）
-  - 使用 Tabs、双引号、全尾随逗号、printWidth 100
+- Source comments and log messages are in English.
+- Formatter: Prettier (see `.prettierrc`)
+  - Tabs, double quotes, all trailing commas, print width 100.
 
-## pi 扩展开发约定
+## pi Extension Conventions
 
-- 扩展入口文件由 pi 通过 `jiti` 加载，无需编译
-- 类型在运行时从 `@earendil-works/pi-coding-agent` 解析
-- 若类型声明暂不完整，可在文件顶部使用 `// @ts-nocheck`
-- `package.json` 的 `pi.extensions` 字段指向扩展目录（如 `./extensions`）
-- 包名建议以 `pi-` 为前缀
+- Each extension lives in `packages/<name>`.
+- The package name should start with `pi-` (e.g. `@zineyu/pi-hashline`).
+- Extension source files are loaded by pi via `jiti`; no compile step is needed.
+- Types are resolved at runtime from `@earendil-works/pi-coding-agent`.
+- If type declarations are incomplete, `// @ts-nocheck` may be used at the top of a file.
+- The `pi.extensions` field in each package points to the extension entry file(s).
+- The root `package.json` `pi.extensions` field lists all extension entries for repository-wide installs.
+
+## Adding a new extension
+
+1. Create `packages/pi-<name>`.
+2. Add a `package.json` with the appropriate `name`, `repository.directory`, `files`, and `pi.extensions`.
+3. Add the new entry file path to the root `package.json` `pi.extensions` array.
+4. Update the root `README.md` extension table.
 
 ## Security & Safety
 
-- 扩展通过 `hashline_edit` 工具直接读写用户文件系统，操作前由锚点哈希校验确保文件未被并发修改
-- 无密钥或敏感数据管理需求
+- Extensions may read and write user files through pi tool APIs. Validate inputs and avoid destructive defaults.
+- Hashline specifically verifies anchor hashes before applying edits to prevent concurrent modification corruption.
 
 ## References
 
-- `README.md` — 项目简介与使用说明
-- `extensions/hashline.ts` — 扩展主实现
+- `README.md` — project overview
+- `packages/pi-hashline/AGENTS.md` — hashline-specific rules
+- `packages/pi-hashline/src/hashline.ts` — hashline extension implementation
